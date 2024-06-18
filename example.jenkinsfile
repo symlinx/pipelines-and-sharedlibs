@@ -1,0 +1,39 @@
+pipeline {
+    agent {
+        docker {
+            lavel 'my-label-1'
+            image 'tools/maven/maven3:3.8.0'
+        }
+    }
+    stages {
+        stage('stage 1') {
+            agent {
+                docker {
+                    label 'my-label-2'
+                    image 'gradle:8.2.0-jdk17-alpine'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh 'gradle --version'
+            }
+        }
+        stage('stage 2') {
+            steps {
+                sh 'mvn --version'
+            }
+        }
+        stage('stage 3') {
+            agent {
+                docker {
+                    label 'my-label-3'
+                    image 'node:8.2.0-jdk17-alpine'
+
+                }
+            }
+            steps {
+                sh 'node --version'
+            }
+        }
+    }
+}
