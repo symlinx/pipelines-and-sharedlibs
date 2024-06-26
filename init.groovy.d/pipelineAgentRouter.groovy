@@ -7,20 +7,24 @@ import jenkins.plugins.git.GitSCMSource
 
 def instance = Jenkins.getInstance()
 
+
+// installs shared lib and listener for docker to kuberntes pipeline translation using labels
+
 try {
     // Ensure the shared library is available globally
     def globalLibraries = instance.getDescriptorByType(GlobalLibraries.class).getLibraries()
     if (!globalLibraries.find { it.name == 'pipelineAgentRouterLibrary' }) {
         def libraryConfiguration = new LibraryConfiguration('pipelineAgentRouterLibrary',
             new SCMSourceRetriever(new GitSCMSource(
-                'your-git-repo-url', // Replace with your Git repository URL
-                'your-git-credentials-id', // Replace with your Jenkins credential ID for Git authentication
+                'your-git-repo-url', // Git repository URL
+                'git_credential', // Jenkins credential ID for Git authentication
                 '*',
                 '',
                 true)))
-        libraryConfiguration.setDefaultVersion('master')
+        libraryConfiguration.setDefaultVersion('main')
         libraryConfiguration.setImplicit(true)
         globalLibraries.add(libraryConfiguration)
+        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Sharedlib pipelineAgentRouterLibrary created successfully on master")
     }
 
     // Add a listener to intercept pipeline execution
