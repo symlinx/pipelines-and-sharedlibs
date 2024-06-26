@@ -40,8 +40,14 @@ try {
                         String originalPipelineScript = definition.script
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Intercepted job: ${job.name}")
 
+                        // Check if the shared library is available
+                        def libDir = Paths.get(Jenkins.instance.getRootDir().absolutePath, 'workflow-libs', 'pipelineAgentRouterLibrary', 'vars')
+                        if (!libDir.toFile().exists()) {
+                            throw new IllegalStateException("Shared library not found in expected path: ${libDir}")
+                        }
+
                         // Load the shared library and wrap the pipeline script
-                        def libLoader = new GroovyShell().parse(new File('/var/jenkins_home/workflow-libs/pipelineAgentRouterLibrary/vars/pipelineAgentRouter.groovy'))
+                        def libLoader = new GroovyShell().parse(new File(libDir.toFile(), 'pipelineAgentRouter.groovy'))
                         String modifiedPipelineScript = libLoader.call(originalPipelineScript)
 
                         definition.setScript(modifiedPipelineScript)
