@@ -49,7 +49,15 @@ try {
                 if (item.task instanceof WorkflowJob) {
                     WorkflowJob job = (WorkflowJob) item.task
 
+                    // Check if the job is already modified to prevent infinite loop
+                    def buildEnv = getLastBuildEnvironment(job)
+                    if (buildEnv['PIPELINE_AGENT_ROUTER_MODIFIED'] == 'true') {
+                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
+                        return null // Allow the job to run
+                    }
+
                     def definition = job.getDefinition()
+
                     if (definition != null) {
                         String originalPipelineScript
                         boolean isScmFlowDefinition = false
@@ -68,13 +76,6 @@ try {
                         } else {
                             println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Unsupported job definition type: ${definition.getClass()}")
                             return null
-                        }
-
-                        // Check if the job is already modified to prevent infinite loop
-                        def buildEnv = getLastBuildEnvironment(job)
-                        if (buildEnv['PIPELINE_AGENT_ROUTER_MODIFIED'] == 'true') {
-                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
-                            return null // Allow the job to run
                         }
 
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Intercepted job: ${job.name}")
