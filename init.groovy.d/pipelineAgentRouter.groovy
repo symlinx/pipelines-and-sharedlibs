@@ -13,6 +13,8 @@ import hudson.FilePath
 import hudson.model.TaskListener
 import hudson.model.ParametersAction
 import hudson.model.StringParameterValue
+import hudson.EnvVars
+import hudson.model.Run
 
 def instance = Jenkins.getInstance()
 
@@ -47,17 +49,7 @@ try {
                 if (item.task instanceof WorkflowJob) {
                     WorkflowJob job = (WorkflowJob) item.task
 
-                    // Check if the job is already modified to prevent infinite loop
-                    def paramsAction = item.getAction(ParametersAction)
-                    def modified = paramsAction?.getParameter("PIPELINE_AGENT_ROUTER_MODIFIED")?.value == "true"
-
-                    if (modified) {
-                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
-                        return null // Allow the job to run
-                    }
-
                     def definition = job.getDefinition()
-
                     if (definition != null) {
                         String originalPipelineScript
                         boolean isScmFlowDefinition = false
@@ -76,6 +68,13 @@ try {
                         } else {
                             println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Unsupported job definition type: ${definition.getClass()}")
                             return null
+                        }
+
+                        // Check if the job is already modified to prevent infinite loop
+                        def buildEnv = getLastBuildEnvironment(job)
+                        if (buildEnv['PIPELINE_AGENT_ROUTER_MODIFIED'] == 'true') {
+                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
+                            return null // Allow the job to run
                         }
 
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Intercepted job: ${job.name}")
@@ -97,7 +96,7 @@ try {
                         // Execute the modified pipeline script dynamically with the environment variable
                         def script = new CpsFlowDefinition("env.PIPELINE_AGENT_ROUTER_MODIFIED = 'true'\n" + modifiedPipelineScript, true)
                         job.setDefinition(script)
-                        job.scheduleBuild2(0, new ParametersAction(new StringParameterValue("PIPELINE_AGENT_ROUTER_MODIFIED", "true")))
+                        job.scheduleBuild2(0)
                     }
                 }
             } catch (Exception e) {
@@ -105,6 +104,14 @@ try {
                 e.printStackTrace()
             }
             return null  // Allow the job to run
+        }
+
+        private EnvVars getLastBuildEnvironment(WorkflowJob job) {
+            Run lastBuild = job.getLastBuild()
+            if (lastBuild != null) {
+                return lastBuild.getEnvironment(TaskListener.NULL)
+            }
+            return new EnvVars()
         }
     }
 
