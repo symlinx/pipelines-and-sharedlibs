@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            lavel 'my-label-1'
+            label 'my-label-1'
             image 'tools/maven/maven3-openjdk11:3.8.0'
         }
     }

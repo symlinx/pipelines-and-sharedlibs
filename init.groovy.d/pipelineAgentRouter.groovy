@@ -11,13 +11,19 @@ import hudson.model.Queue
 import hudson.model.queue.CauseOfBlockage
 import hudson.FilePath
 import hudson.model.TaskListener
+import hudson.model.Run
+import hudson.model.Cause
+import hudson.plugins.git.GitSCM
+import hudson.Launcher
+import hudson.scm.SCM
+import hudson.scm.SCMRevisionState
 
 class PipelineAgentRouterAction extends InvisibleAction {}
 
 def instance = Jenkins.getInstance()
 
 try {
-    // Define the shared library configuration once
+    // Define the shared library configuration
     def libraryConfiguration = new LibraryConfiguration('pipelineAgentRouterLibrary',
         new SCMSourceRetriever(new GitSCMSource(
             'pipeline-agent-router-lib',  // ID for the SCM source
@@ -48,28 +54,35 @@ try {
                     WorkflowJob job = (WorkflowJob) item.task
 
                     // Check if the job is already modified to prevent infinite loop
-                    if (job.getLastBuild()?.getAction(PipelineAgentRouterAction) != null) {
+                    def modified = job.getLastBuild()?.getAction(PipelineAgentRouterAction) != null
+
+                    if (modified) {
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
                         return null // Allow the job to run
                     }
 
                     def definition = job.getDefinition()
-
                     if (definition != null) {
                         String originalPipelineScript
-                        boolean isScmFlowDefinition = false
 
                         if (definition instanceof CpsFlowDefinition) {
                             originalPipelineScript = definition.script
                         } else if (definition instanceof CpsScmFlowDefinition) {
-                            isScmFlowDefinition = true
                             // Extract the pipeline script from the SCM
-                            def scm = definition.getScm()
-                            def workspace = new FilePath(new File(instance.getRootDir(), 'workspace/temp'))
-                            def listener = TaskListener.NULL
-                            scm.checkout(job, workspace, listener, null)
-                            def scriptFile = workspace.child(definition.getScriptPath())
-                            originalPipelineScript = scriptFile.readToString()
+                            SCM scm = definition.getScm()
+                            Run<?, ?> lastBuild = job.getLastBuild()
+                            if (scm instanceof GitSCM && lastBuild != null) {
+                                FilePath workspace = new FilePath(new File(instance.getRootDir(), 'workspace/temp'))
+                                TaskListener listener = TaskListener.NULL
+                                Launcher launcher = instance.createLauncher(listener)
+                                File changelogFile = File.createTempFile("changelog", ".txt")
+                                scm.checkout(lastBuild, launcher, workspace, listener, changelogFile, SCMRevisionState.NONE)
+                                FilePath scriptFile = workspace.child(definition.getScriptPath())
+                                originalPipelineScript = scriptFile.readToString()
+                            } else {
+                                println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Unsupported SCM type or missing last build.")
+                                return null
+                            }
                         } else {
                             println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Unsupported job definition type: ${definition.getClass()}")
                             return null
@@ -91,11 +104,16 @@ try {
                         def libLoader = new GroovyShell().parse(new File(instance.getRootDir(), 'workflow-libs/pipelineAgentRouterLibrary/vars/pipelineAgentRouterLibrary.groovy'))
                         String modifiedPipelineScript = libLoader.call(originalPipelineScript, job.name)
 
-                        // Execute the modified pipeline script dynamically with the custom action
-                        def script = new CpsFlowDefinition(modifiedPipelineScript, true)
-                        job.setDefinition(script)
-                        def nextBuild = job.scheduleBuild2(0).get()
-                        nextBuild.addAction(new PipelineAgentRouterAction())
+                        // Set the modified pipeline script to the job definition
+                        if (definition instanceof CpsFlowDefinition) {
+                            job.setDefinition(new CpsFlowDefinition(modifiedPipelineScript, true))
+                        } else if (definition instanceof CpsScmFlowDefinition) {
+                            FilePath scriptFile = new FilePath(new File(workspaceLib.getRemote(), definition.getScriptPath()))
+                            scriptFile.write(modifiedPipelineScript, 'UTF-8')
+                        }
+                        
+                        // Add the custom action to mark the job as modified
+                        job.getLastBuild().addAction(new PipelineAgentRouterAction())
                     }
                 }
             } catch (Exception e) {
