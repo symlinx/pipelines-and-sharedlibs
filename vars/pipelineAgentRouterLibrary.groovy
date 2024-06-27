@@ -1,4 +1,4 @@
-// vars/pipelineAgentRouter.groovy
+// vars/pipelineAgentRouterLibrary.groovy
 import hudson.model.TaskListener
 
 def call(String pipelineScript) {
@@ -65,7 +65,7 @@ def getLabelForDockerImage(String dockerImage) {
     // Replace ':' with '_'
     def sanitizedImageName = imageName.replace(':', '_')
     def label = "GFS_${sanitizedImageName}"
-    logMessage("Generated label '${label}' for docker image '${dockerImage}'")
+    logMessage("Switching pipeline build to label '${label}' for docker image '${dockerImage}'")
     return label
 }
 
@@ -79,6 +79,6 @@ def validatePipelineScript(String pipelineScript) {
     }
 }
 
-def logMessage(String message) {
-    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] ${message}")
+def logMessage(String message, String jobName) {
+    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [SharedLib: pipelineAgentRouterLibrary] [Job: ${jobName}] ${message}")
 }
