@@ -10,34 +10,34 @@ import org.jenkinsci.plugins.workflow.libs.LibraryConfiguration
 import org.jenkinsci.plugins.workflow.libs.SCMSourceRetriever
 import hudson.model.queue.QueueTaskDispatcher
 import hudson.model.Queue
+import hudson.model.queue.CauseOfBlockage
 
 def instance = Jenkins.getInstance()
 
-
-// installs shared lib and listener for docker to kuberntees pipeline translation using labels
-
 try {
     // Ensure the shared library is available globally
-    def globalLibraries = instance.getDescriptorByType(GlobalLibraries.class).getLibraries()
-    if (!globalLibraries.find { it.name == 'pipelineAgentRouterLibrary' }) {
+    def globalLibraries = instance.getDescriptorByType(GlobalLibraries.class)
+    def libraries = new ArrayList<>(globalLibraries.getLibraries())
+    if (!libraries.find { it.name == 'pipelineAgentRouterLibrary' }) {
         def libraryConfiguration = new LibraryConfiguration('pipelineAgentRouterLibrary',
             new SCMSourceRetriever(new GitSCMSource(
                 'pipeline-agent-router-lib',  // ID for the SCM source
-                'https://bitbucket.org/your-username/pipelineAgentRouterLibrary.git', // Git repository URL
+                'git@github.com:symlinx/pipeline-agent-router.git', // Git repository URL
                 'git_credential', // Jenkins credential ID for Git authentication
                 '*',
                 '',
                 true)))
-        libraryConfiguration.setDefaultVersion('master')
+        libraryConfiguration.setDefaultVersion('main')
         libraryConfiguration.setImplicit(true)
-        globalLibraries.add(libraryConfiguration)
-        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Created Sharedlib pipelineAgentRouterLibrary on master")
+        libraries.add(libraryConfiguration)
+        globalLibraries.setLibraries(libraries)
+        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Created Sharedlib pipelineAgentRouterLibrary on jenkins master")
     }
 
     // Add a dispatcher to intercept pipeline execution
     def dispatcher = new QueueTaskDispatcher() {
         @Override
-        boolean canRun(Queue.Item item) {
+        CauseOfBlockage canRun(Queue.Item item) {
             try {
                 if (item.task instanceof WorkflowJob) {
                     WorkflowJob job = (WorkflowJob) item.task
@@ -64,7 +64,7 @@ try {
                 println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Error processing job: ${e.message}")
                 e.printStackTrace()
             }
-            return true
+            return null  // Allow the job to run
         }
     }
 
