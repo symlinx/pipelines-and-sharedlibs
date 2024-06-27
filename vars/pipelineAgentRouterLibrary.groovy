@@ -64,7 +64,7 @@ def getLabelForDockerImage(String dockerImage, String jobName) {
     def imageName = dockerImage.tokenize('/').last()
     // Replace ':' with '_'
     def sanitizedImageName = imageName.replace(':', '_')
-    def label = "POD_${sanitizedImageName}"
+    def label = "GFS_${sanitizedImageName}"
     logMessage("Generated label '${label}' for docker image '${dockerImage}'", jobName)
     return label
 }
