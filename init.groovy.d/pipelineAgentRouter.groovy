@@ -82,7 +82,7 @@ try {
                     }
                 }
             } catch (Exception e) {
-                println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Error processing job: ${e.message}")
+                println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] Error processing job: ${e.message}")
                 e.printStackTrace()
             }
             return null  // Allow the job to run
