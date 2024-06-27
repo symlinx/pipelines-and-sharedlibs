@@ -68,8 +68,13 @@ try {
 
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Intercepted job: ${job.name}")
 
-                        // Use LibraryAdder to load the shared library
-                        LibraryAdder.get().addLibraries([libraryConfiguration], job.getLastBuild(), TaskListener.NULL)
+                        // Use LibraryRetriever to load the shared library
+                        def retriever = libraryConfiguration.getRetriever()
+                        def workspaceLib = new FilePath(new File(Jenkins.instance.getRootDir(), 'workflow-libs/pipelineAgentRouterLibrary'))
+                        def dummyRun = job.getLastBuild()
+                        def dummyListener = TaskListener.NULL
+
+                        retriever.retrieve("pipelineAgentRouterLibrary", "main", workspaceLib, dummyRun, dummyListener)
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Shared library retrieved successfully")
 
                         // Load the shared library and wrap the pipeline script
