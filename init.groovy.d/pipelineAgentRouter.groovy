@@ -5,6 +5,11 @@ import org.jenkinsci.plugins.workflow.flow.*
 import org.jenkinsci.plugins.workflow.cps.global.*
 import jenkins.plugins.git.GitSCMSource
 import java.nio.file.Paths
+import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
+import org.jenkinsci.plugins.workflow.libs.LibraryConfiguration
+import org.jenkinsci.plugins.workflow.libs.SCMSourceRetriever
+import hudson.model.Queue
+import hudson.model.QueueListener
 
 def instance = Jenkins.getInstance()
 
