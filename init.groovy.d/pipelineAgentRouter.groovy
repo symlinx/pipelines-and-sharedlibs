@@ -9,28 +9,29 @@ import org.jenkinsci.plugins.workflow.libs.*
 import hudson.model.queue.QueueTaskDispatcher
 import hudson.model.Queue
 import hudson.model.queue.CauseOfBlockage
-import hudson.model.Run
 import hudson.FilePath
 import hudson.model.TaskListener
 
 def instance = Jenkins.getInstance()
 
 try {
+    // Define the shared library configuration once
+    def libraryConfiguration = new LibraryConfiguration('pipelineAgentRouterLibrary',
+        new SCMSourceRetriever(new GitSCMSource(
+            'pipeline-agent-router-lib',  // ID for the SCM source
+            'git@github.com:symlinx/pipeline-agent-router.git', // Git repository URL
+            'git_credential', // Jenkins credential ID for Git authentication
+            '*', // includes
+            '', // excludes
+            true // ignoreOnPushNotifications
+        )))
+    libraryConfiguration.setDefaultVersion('main')
+    libraryConfiguration.setImplicit(true)
+
     // Ensure the shared library is available globally
     def globalLibraries = instance.getDescriptorByType(GlobalLibraries.class)
     def libraries = new ArrayList<>(globalLibraries.getLibraries())
     if (!libraries.find { it.name == 'pipelineAgentRouterLibrary' }) {
-        def libraryConfiguration = new LibraryConfiguration('pipelineAgentRouterLibrary',
-            new SCMSourceRetriever(new GitSCMSource(
-                'pipeline-agent-router-lib',  // ID for the SCM source
-                'git@github.com:symlinx/pipeline-agent-router.git', // Git repository URL
-                'git_credential', // Jenkins credential ID for Git authentication
-                '*', // includes
-                '', // excludes
-                true // ignoreOnPushNotifications
-            )))
-        libraryConfiguration.setDefaultVersion('main')
-        libraryConfiguration.setImplicit(true)
         libraries.add(libraryConfiguration)
         globalLibraries.setLibraries(libraries)
         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Created Sharedlib pipelineAgentRouterLibrary on master")
@@ -67,38 +68,19 @@ try {
 
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Intercepted job: ${job.name}")
 
-                        // Use LibraryAdder and LibraryRetriever to load the shared library
-                        def libraryAdder = new LibraryAdder()
-                        def libraryRetriever = new LibraryRetriever()
-                        def library = new LibraryConfiguration('pipelineAgentRouterLibrary', new SCMSourceRetriever(new GitSCMSource(
-                            'pipeline-agent-router-lib',
-                            'git@github.com:symlinx/pipeline-agent-router.git',
-                            'git_credential',
-                            '*', // includes
-                            '', // excludes
-                            true // ignoreOnPushNotifications
-                        )))
-                        library.setDefaultVersion('main')
-                        library.setImplicit(true)
-                        
-                        def workspace = new FilePath(new File(Jenkins.instance.getRootDir(), 'workflow-libs/pipelineAgentRouterLibrary'))
-                        def dummyRun = job.getLastBuild()
-                        def dummyListener = TaskListener.NULL
-                        
-                        libraryRetriever.retrieve(library, workspace, dummyRun, dummyListener)
+                        // Use LibraryAdder to load the shared library
+                        LibraryAdder.get().addLibraries([libraryConfiguration], job.getLastBuild(), TaskListener.NULL)
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Shared library retrieved successfully")
 
                         // Load the shared library and wrap the pipeline script
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Calling Shared library for pipeline script analysis/modification")
-                        def libLoader = new GroovyShell().parse(new File(workspace.toString(), 'vars/pipelineAgentRouterLibrary.groovy'))
+                        def libLoader = new GroovyShell().parse(new File(instance.getRootDir(), 'workflow-libs/pipelineAgentRouterLibrary/vars/pipelineAgentRouterLibrary.groovy'))
                         String modifiedPipelineScript = libLoader.call(originalPipelineScript, job.name)
 
                         // Execute the modified pipeline script dynamically
                         def script = new CpsFlowDefinition(modifiedPipelineScript, true)
-                        def flowDefinition = (CpsFlowDefinition)script
-                        def execution = job.createExecutable() as WorkflowRun
-                        execution.setDefinition(flowDefinition)
-                        execution.start()
+                        job.setDefinition(script)
+                        job.scheduleBuild2(0)
                     }
                 }
             } catch (Exception e) {
