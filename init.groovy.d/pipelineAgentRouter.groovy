@@ -11,10 +11,8 @@ import hudson.model.Queue
 import hudson.model.queue.CauseOfBlockage
 import hudson.FilePath
 import hudson.model.TaskListener
-import hudson.model.ParametersAction
-import hudson.model.StringParameterValue
-import hudson.EnvVars
-import hudson.model.Run
+
+class PipelineAgentRouterAction extends InvisibleAction {}
 
 def instance = Jenkins.getInstance()
 
@@ -50,8 +48,7 @@ try {
                     WorkflowJob job = (WorkflowJob) item.task
 
                     // Check if the job is already modified to prevent infinite loop
-                    def buildEnv = getLastBuildEnvironment(job)
-                    if (buildEnv['PIPELINE_AGENT_ROUTER_MODIFIED'] == 'true') {
+                    if (job.getLastBuild()?.getAction(PipelineAgentRouterAction) != null) {
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
                         return null // Allow the job to run
                     }
@@ -94,10 +91,11 @@ try {
                         def libLoader = new GroovyShell().parse(new File(instance.getRootDir(), 'workflow-libs/pipelineAgentRouterLibrary/vars/pipelineAgentRouterLibrary.groovy'))
                         String modifiedPipelineScript = libLoader.call(originalPipelineScript, job.name)
 
-                        // Execute the modified pipeline script dynamically with the environment variable
-                        def script = new CpsFlowDefinition("env.PIPELINE_AGENT_ROUTER_MODIFIED = 'true'\n" + modifiedPipelineScript, true)
+                        // Execute the modified pipeline script dynamically with the custom action
+                        def script = new CpsFlowDefinition(modifiedPipelineScript, true)
                         job.setDefinition(script)
-                        job.scheduleBuild2(0)
+                        def nextBuild = job.scheduleBuild2(0).get()
+                        nextBuild.addAction(new PipelineAgentRouterAction())
                     }
                 }
             } catch (Exception e) {
@@ -105,14 +103,6 @@ try {
                 e.printStackTrace()
             }
             return null  // Allow the job to run
-        }
-
-        private EnvVars getLastBuildEnvironment(WorkflowJob job) {
-            Run lastBuild = job.getLastBuild()
-            if (lastBuild != null) {
-                return lastBuild.getEnvironment(TaskListener.NULL)
-            }
-            return new EnvVars()
         }
     }
 
