@@ -11,7 +11,8 @@ import hudson.model.Queue
 import hudson.model.queue.CauseOfBlockage
 import hudson.FilePath
 import hudson.model.TaskListener
-import hudson.model.Cause
+import hudson.model.ParametersAction
+import hudson.model.StringParameterValue
 
 def instance = Jenkins.getInstance()
 
@@ -45,10 +46,12 @@ try {
             try {
                 if (item.task instanceof WorkflowJob) {
                     WorkflowJob job = (WorkflowJob) item.task
-                    def buildEnv = item.getEnvironment(TaskListener.NULL)
 
                     // Check if the job is already modified to prevent infinite loop
-                    if (buildEnv['PIPELINE_AGENT_ROUTER_MODIFIED'] == 'true') {
+                    def paramsAction = item.getAction(ParametersAction)
+                    def modified = paramsAction?.getParameter("PIPELINE_AGENT_ROUTER_MODIFIED")?.value == "true"
+
+                    if (modified) {
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
                         return null // Allow the job to run
                     }
@@ -94,7 +97,7 @@ try {
                         // Execute the modified pipeline script dynamically with the environment variable
                         def script = new CpsFlowDefinition("env.PIPELINE_AGENT_ROUTER_MODIFIED = 'true'\n" + modifiedPipelineScript, true)
                         job.setDefinition(script)
-                        job.scheduleBuild2(0)
+                        job.scheduleBuild2(0, new ParametersAction(new StringParameterValue("PIPELINE_AGENT_ROUTER_MODIFIED", "true")))
                     }
                 }
             } catch (Exception e) {
