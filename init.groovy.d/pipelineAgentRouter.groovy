@@ -46,6 +46,12 @@ try {
                     WorkflowJob job = (WorkflowJob) item.task
                     def definition = job.getDefinition()
 
+                    // Check if the job is already modified to prevent infinite loop
+                    if (item.getParams().containsKey("PIPELINE_AGENT_ROUTER_MODIFIED")) {
+                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
+                        return null // Allow the job to run
+                    }
+
                     if (definition != null) {
                         String originalPipelineScript
                         boolean isScmFlowDefinition = false
@@ -85,7 +91,7 @@ try {
                         // Execute the modified pipeline script dynamically
                         def script = new CpsFlowDefinition(modifiedPipelineScript, true)
                         job.setDefinition(script)
-                        job.scheduleBuild2(0)
+                        job.scheduleBuild2(0, new ParametersAction(new StringParameterValue("PIPELINE_AGENT_ROUTER_MODIFIED", "true")))
                     }
                 }
             } catch (Exception e) {
