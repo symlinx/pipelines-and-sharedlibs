@@ -8,8 +8,8 @@ import java.nio.file.Paths
 import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
 import org.jenkinsci.plugins.workflow.libs.LibraryConfiguration
 import org.jenkinsci.plugins.workflow.libs.SCMSourceRetriever
+import hudson.model.queue.QueueTaskDispatcher
 import hudson.model.Queue
-import hudson.model.QueueListener
 
 def instance = Jenkins.getInstance()
 
@@ -28,17 +28,16 @@ try {
                 '*',
                 '',
                 true)))
-
-        libraryConfiguration.setDefaultVersion('main')
+        libraryConfiguration.setDefaultVersion('master')
         libraryConfiguration.setImplicit(true)
         globalLibraries.add(libraryConfiguration)
         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Created Sharedlib pipelineAgentRouterLibrary on master")
     }
 
-    // Add a listener to intercept pipeline execution
-    def listener = new QueueListener() {
+    // Add a dispatcher to intercept pipeline execution
+    def dispatcher = new QueueTaskDispatcher() {
         @Override
-        void onEnterWaiting(Queue.WaitingItem item) {
+        boolean canRun(Queue.Item item) {
             try {
                 if (item.task instanceof WorkflowJob) {
                     WorkflowJob job = (WorkflowJob) item.task
@@ -65,11 +64,12 @@ try {
                 println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Error processing job: ${e.message}")
                 e.printStackTrace()
             }
+            return true
         }
     }
 
-    Jenkins.instance.queue.addListener(listener)
-    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Added QueueListener to intercept pipeline jobs.")
+    QueueTaskDispatcher.all().add(dispatcher)
+    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Added QueueTaskDispatcher to intercept pipeline jobs.")
 
 } catch (Exception e) {
     println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Error in initialization script: ${e.message}")
