@@ -48,13 +48,13 @@ try {
 
                     if (definition != null) {
                         String originalPipelineScript = definition.script
-                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${jobName}] Intercepted new build of pipeline")
+                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Intercepted new build of pipeline")
 
                         // Check if the shared library is available in the expected location
                         def libDir = Paths.get(Jenkins.instance.getRootDir().absolutePath, 'workflow-libs', 'pipelineAgentRouterLibrary', 'vars')
                         def libFile = new File(libDir.toFile(), 'pipelineAgentRouterLibrary.groovy')
                         if (!libFile.exists()) {
-                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${jobName}] Shared library not found, retrieving from scm...")
+                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Shared library not found, retrieving from scm...")
                             // Retrieve and validate the shared library
                             def libRetriever = new SCMSourceRetriever(new GitSCMSource(
                                 'pipeline-agent-router-lib',
@@ -68,21 +68,21 @@ try {
                             def dummyListener = TaskListener.NULL
 
                             libRetriever.retrieve("pipelineAgentRouterLibrary", "main", workspace, dummyRun, dummyListener)
-                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${jobName}] Shared library retrieved successfully")
+                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Shared library retrieved successfully")
                         }
 
                         // Load the shared library and wrap the pipeline script
-                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${jobName}] Calling Shared library for pipeline script analysis/modification")
+                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Calling Shared library for pipeline script analysis/modification")
                         def libLoader = new GroovyShell().parse(libFile)
                         String modifiedPipelineScript = libLoader.call(originalPipelineScript)
 
                         // Set the modified script back to the job definition
-                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${jobName}] Updating new pipeline script in build Queue")
+                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Updating new pipeline script in build Queue")
                         job.setDefinition(new CpsFlowDefinition(modifiedPipelineScript, definition.isSandbox()))
                     }
                 }
             } catch (Exception e) {
-                println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${jobName}] Error processing job: ${e.message}")
+                println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Error processing job: ${e.message}")
                 e.printStackTrace()
             }
             return null  // Allow the job to run

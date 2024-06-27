@@ -79,6 +79,6 @@ def validatePipelineScript(String pipelineScript) {
     }
 }
 
-def logMessage(String message, String jobName) {
-    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [SharedLib: pipelineAgentRouterLibrary] [Job: ${jobName}] ${message}")
+def logMessage(String message) {
+    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [SharedLib: pipelineAgentRouterLibrary] [Job: ${env.JOB_NAME}] ${message}")
 }
