@@ -50,7 +50,7 @@ def modifyDeclarativePipeline(String pipelineScript) {
     }
 
     if (!matched) {
-        logMessage("No matching agent { docker { image '...' } } block found. Running the original script.")
+        logMessage("No matching docker agent. Running the original script.")
     } else {
         logMessage("Modified pipeline script:\n${modifiedScript}")
         validatePipelineScript(modifiedScript)
