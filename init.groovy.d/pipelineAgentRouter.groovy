@@ -5,9 +5,7 @@ import org.jenkinsci.plugins.workflow.flow.*
 import org.jenkinsci.plugins.workflow.cps.global.*
 import jenkins.plugins.git.GitSCMSource
 import java.nio.file.Paths
-import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
-import org.jenkinsci.plugins.workflow.libs.LibraryConfiguration
-import org.jenkinsci.plugins.workflow.libs.SCMSourceRetriever
+import org.jenkinsci.plugins.workflow.libs.*
 import hudson.model.queue.QueueTaskDispatcher
 import hudson.model.Queue
 import hudson.model.queue.CauseOfBlockage
@@ -45,46 +43,66 @@ try {
             try {
                 if (item.task instanceof WorkflowJob) {
                     WorkflowJob job = (WorkflowJob) item.task
-                    CpsFlowDefinition definition = job.getDefinition() as CpsFlowDefinition
+                    def definition = job.getDefinition()
 
                     if (definition != null) {
-                        String originalPipelineScript = definition.script
-                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Intercepted job: ${job.name}")
+                        String originalPipelineScript
+                        boolean isScmFlowDefinition = false
 
-                        // Check if the shared library is available in the expected location
-                        def libDir = Paths.get(Jenkins.instance.getRootDir().absolutePath, 'workflow-libs', 'pipelineAgentRouterLibrary', 'vars')
-                        def libFile = new File(libDir.toFile(), 'pipelineAgentRouterLibrary.groovy')
-                        if (!libFile.exists()) {
-                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Shared library not found, retrieving...")
-                            // Retrieve and validate the shared library
-                            def libRetriever = new SCMSourceRetriever(new GitSCMSource(
-                                'pipeline-agent-router-lib',
-                                'git@github.com:symlinx/pipeline-agent-router.git',
-                                'git_credential',
-                                '*', // includes
-                                '', // excludes
-                                true // ignoreOnPushNotifications
-                            ))
-                            // Retrieve to the correct location
-                            def workspace = new FilePath(new File(Jenkins.instance.getRootDir(), 'workflow-libs/pipelineAgentRouterLibrary'))
-                            def dummyRun = job.getLastBuild()
-                            def dummyListener = TaskListener.NULL
-
-                            libRetriever.retrieve("pipelineAgentRouterLibrary", "main", workspace, dummyRun, dummyListener)
-                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Shared library retrieved successfully")
+                        if (definition instanceof CpsFlowDefinition) {
+                            originalPipelineScript = definition.script
+                        } else if (definition instanceof CpsScmFlowDefinition) {
+                            isScmFlowDefinition = true
+                            // Extract the pipeline script from the SCM
+                            def scm = definition.getScm()
+                            def workspace = new FilePath(new File(instance.getRootDir(), 'workspace/temp'))
+                            def listener = TaskListener.NULL
+                            scm.checkout(job, workspace, listener, null)
+                            def scriptFile = workspace.child(definition.getScriptPath())
+                            originalPipelineScript = scriptFile.readToString()
+                        } else {
+                            println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Unsupported job definition type: ${definition.getClass()}")
+                            return null
                         }
+
+                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Intercepted job: ${job.name}")
+
+                        // Use LibraryAdder and LibraryRetriever to load the shared library
+                        def libraryAdder = new LibraryAdder()
+                        def libraryRetriever = new LibraryRetriever()
+                        def library = new LibraryConfiguration('pipelineAgentRouterLibrary', new SCMSourceRetriever(new GitSCMSource(
+                            'pipeline-agent-router-lib',
+                            'git@github.com:symlinx/pipeline-agent-router.git',
+                            'git_credential',
+                            '*', // includes
+                            '', // excludes
+                            true // ignoreOnPushNotifications
+                        )))
+                        library.setDefaultVersion('main')
+                        library.setImplicit(true)
+                        
+                        def workspace = new FilePath(new File(Jenkins.instance.getRootDir(), 'workflow-libs/pipelineAgentRouterLibrary'))
+                        def dummyRun = job.getLastBuild()
+                        def dummyListener = TaskListener.NULL
+                        
+                        libraryRetriever.retrieve(library, workspace, dummyRun, dummyListener)
+                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Shared library retrieved successfully")
 
                         // Load the shared library and wrap the pipeline script
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Calling Shared library for pipeline script analysis/modification")
-                        def libLoader = new GroovyShell().parse(libFile)
+                        def libLoader = new GroovyShell().parse(new File(workspace.toString(), 'vars/pipelineAgentRouterLibrary.groovy'))
                         String modifiedPipelineScript = libLoader.call(originalPipelineScript, job.name)
 
-                        // Set the modified script back to the job definition
-                        job.setDefinition(new CpsFlowDefinition(modifiedPipelineScript, definition.isSandbox()))
+                        // Execute the modified pipeline script dynamically
+                        def script = new CpsFlowDefinition(modifiedPipelineScript, true)
+                        def flowDefinition = (CpsFlowDefinition)script
+                        def execution = job.createExecutable() as WorkflowRun
+                        execution.setDefinition(flowDefinition)
+                        execution.start()
                     }
                 }
             } catch (Exception e) {
-                println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Error processing job: ${e.message}")
+                println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Error processing job: ${e.message}")
                 e.printStackTrace()
             }
             return null  // Allow the job to run
@@ -92,9 +110,9 @@ try {
     }
 
     QueueTaskDispatcher.all().add(dispatcher)
-    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Added QueueTaskDispatcher to intercept pipeline jobs.")
+    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] Added QueueTaskDispatcher to intercept pipeline jobs.")
 
 } catch (Exception e) {
-    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Error in initialization script: ${e.message}")
+    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] Error in initialization script: ${e.message}")
     e.printStackTrace()
 }
