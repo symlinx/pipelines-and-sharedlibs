@@ -4,11 +4,12 @@ import org.jenkinsci.plugins.workflow.job.*
 import org.jenkinsci.plugins.workflow.flow.*
 import org.jenkinsci.plugins.workflow.cps.global.*
 import jenkins.plugins.git.GitSCMSource
+import java.nio.file.Paths
 
 def instance = Jenkins.getInstance()
 
 
-// installs shared lib and listener for docker to kuberntes pipeline translation using labels
+// installs shared lib and listener for docker to kuberntees pipeline translation using labels
 
 try {
     // Ensure the shared library is available globally
@@ -16,15 +17,17 @@ try {
     if (!globalLibraries.find { it.name == 'pipelineAgentRouterLibrary' }) {
         def libraryConfiguration = new LibraryConfiguration('pipelineAgentRouterLibrary',
             new SCMSourceRetriever(new GitSCMSource(
-                'your-git-repo-url', // Git repository URL
+                'pipeline-agent-router-lib',  // ID for the SCM source
+                'https://bitbucket.org/your-username/pipelineAgentRouterLibrary.git', // Git repository URL
                 'git_credential', // Jenkins credential ID for Git authentication
                 '*',
                 '',
                 true)))
+
         libraryConfiguration.setDefaultVersion('main')
         libraryConfiguration.setImplicit(true)
         globalLibraries.add(libraryConfiguration)
-        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Sharedlib pipelineAgentRouterLibrary created successfully on master")
+        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Created Sharedlib pipelineAgentRouterLibrary on master")
     }
 
     // Add a listener to intercept pipeline execution
@@ -55,6 +58,7 @@ try {
                 }
             } catch (Exception e) {
                 println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Error processing job: ${e.message}")
+                e.printStackTrace()
             }
         }
     }
@@ -64,4 +68,5 @@ try {
 
 } catch (Exception e) {
     println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] Error in initialization script: ${e.message}")
+    e.printStackTrace()
 }

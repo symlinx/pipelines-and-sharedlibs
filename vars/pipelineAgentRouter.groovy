@@ -7,14 +7,14 @@ def call(String pipelineScript) {
 
 def wrapPipeline(String pipelineScript) {
     // Add logging with timestamp
-    println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Original pipeline script:\n${pipelineScript}")
+    logMessage("Original pipeline script:\n${pipelineScript}")
 
     // Check if the script is declarative or scripted
     if (isDeclarativePipeline(pipelineScript)) {
-        println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Detected declarative pipeline.")
+        logMessage("Detected declarative pipeline.")
         pipelineScript = modifyDeclarativePipeline(pipelineScript)
     } else {
-        println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Detected scripted pipeline. No modifications applied.")
+        logMessage("Detected scripted pipeline. No modifications applied.")
     }
 
     return pipelineScript
@@ -37,22 +37,22 @@ def modifyDeclarativePipeline(String pipelineScript) {
     def matcher = (pipelineScript =~ matchPattern)
     while (matcher.find()) {
         def dockerBlock = matcher.group(1)
-        println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Found docker block: ${dockerBlock}")
+        logMessage("Found docker block: ${dockerBlock}")
 
         def imageMatcher = (dockerBlock =~ imagePattern)
         if (imageMatcher.find()) {
             matched = true
             def dockerImage = imageMatcher.group(1)
             def label = getLabelForDockerImage(dockerImage)
-            println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Transforming agent { docker { image '${dockerImage}' } } to agent { label '${label}' }")
+            logMessage("Transforming agent { docker { image '${dockerImage}' } } to agent { label '${label}' }")
             modifiedScript = modifiedScript.replaceFirst(matchPattern, "agent { label '${label}' }")
         }
     }
 
     if (!matched) {
-        println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] No matching agent { docker { image '...' } } block found. Running the original script.")
+        logMessage("No matching agent { docker { image '...' } } block found. Running the original script.")
     } else {
-        println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Modified pipeline script:\n${modifiedScript}")
+        logMessage("Modified pipeline script:\n${modifiedScript}")
         validatePipelineScript(modifiedScript)
     }
 
@@ -62,17 +62,23 @@ def modifyDeclarativePipeline(String pipelineScript) {
 def getLabelForDockerImage(String dockerImage) {
     // Extract the latest string after the last /
     def imageName = dockerImage.tokenize('/').last()
-    def label = "POD_${imageName}"
-    println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Generated label '${label}' for docker image '${dockerImage}'")
+    // Replace ':' with '_'
+    def sanitizedImageName = imageName.replace(':', '_')
+    def label = "GFS_${sanitizedImageName}"
+    logMessage("Generated label '${label}' for docker image '${dockerImage}'")
     return label
 }
 
 def validatePipelineScript(String pipelineScript) {
     try {
         new GroovyShell().parse(pipelineScript)
-        println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Pipeline script validation passed.")
+        logMessage("Pipeline script validation passed.")
     } catch (Exception e) {
-        println("[${new Date().format("yyyy-MM-dd HH:mm:ss")}] Pipeline script validation failed: ${e.message}")
+        logMessage("Pipeline script validation failed: ${e.message}")
         throw new IllegalArgumentException("Modified pipeline script is not valid: ${e.message}")
     }
+}
+
+def logMessage(String message) {
+    println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] ${message}")
 }
