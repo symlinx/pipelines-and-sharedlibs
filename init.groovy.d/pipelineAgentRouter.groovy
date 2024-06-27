@@ -11,6 +11,8 @@ import hudson.model.Queue
 import hudson.model.queue.CauseOfBlockage
 import hudson.FilePath
 import hudson.model.TaskListener
+import hudson.model.ParametersAction
+import hudson.model.StringParameterValue
 
 def instance = Jenkins.getInstance()
 
@@ -44,13 +46,21 @@ try {
             try {
                 if (item.task instanceof WorkflowJob) {
                     WorkflowJob job = (WorkflowJob) item.task
-                    def definition = job.getDefinition()
 
                     // Check if the job is already modified to prevent infinite loop
-                    if (item.getParams().containsKey("PIPELINE_AGENT_ROUTER_MODIFIED")) {
+                    def actions = item.getActions(ParametersAction.class)
+                    def modified = actions.any { action -> 
+                        action.getParameters().any { param -> 
+                            param.getName() == "PIPELINE_AGENT_ROUTER_MODIFIED" 
+                        }
+                    }
+
+                    if (modified) {
                         println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Already modified, allowing the job to run.")
                         return null // Allow the job to run
                     }
+
+                    def definition = job.getDefinition()
 
                     if (definition != null) {
                         String originalPipelineScript
