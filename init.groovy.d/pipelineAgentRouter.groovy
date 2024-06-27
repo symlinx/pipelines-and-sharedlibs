@@ -12,11 +12,11 @@ import hudson.model.queue.CauseOfBlockage
 import hudson.FilePath
 import hudson.model.TaskListener
 import hudson.model.Run
-import hudson.model.Cause
 import hudson.plugins.git.GitSCM
 import hudson.Launcher
 import hudson.scm.SCM
 import hudson.scm.SCMRevisionState
+import hudson.Extension
 
 class PipelineAgentRouterAction extends InvisibleAction {}
 
@@ -64,19 +64,20 @@ try {
                     def definition = job.getDefinition()
                     if (definition != null) {
                         String originalPipelineScript
+                        SCM scmDefinition
 
                         if (definition instanceof CpsFlowDefinition) {
                             originalPipelineScript = definition.script
                         } else if (definition instanceof CpsScmFlowDefinition) {
                             // Extract the pipeline script from the SCM
-                            SCM scm = definition.getScm()
+                            scmDefinition = definition.getScm()
                             Run<?, ?> lastBuild = job.getLastBuild()
-                            if (scm instanceof GitSCM && lastBuild != null) {
+                            if (scmDefinition instanceof GitSCM && lastBuild != null) {
                                 FilePath workspace = new FilePath(new File(instance.getRootDir(), 'workspace/temp'))
                                 TaskListener listener = TaskListener.NULL
                                 Launcher launcher = instance.createLauncher(listener)
                                 File changelogFile = File.createTempFile("changelog", ".txt")
-                                scm.checkout(lastBuild, launcher, workspace, listener, changelogFile, SCMRevisionState.NONE)
+                                scmDefinition.checkout(lastBuild, launcher, workspace, listener, changelogFile, SCMRevisionState.NONE)
                                 FilePath scriptFile = workspace.child(definition.getScriptPath())
                                 originalPipelineScript = scriptFile.readToString()
                             } else {
@@ -105,15 +106,12 @@ try {
                         String modifiedPipelineScript = libLoader.call(originalPipelineScript, job.name)
 
                         // Set the modified pipeline script to the job definition
-                        if (definition instanceof CpsFlowDefinition) {
-                            job.setDefinition(new CpsFlowDefinition(modifiedPipelineScript, true))
-                        } else if (definition instanceof CpsScmFlowDefinition) {
-                            FilePath scriptFile = new FilePath(new File(workspaceLib.getRemote(), definition.getScriptPath()))
-                            scriptFile.write(modifiedPipelineScript, 'UTF-8')
-                        }
-                        
-                        // Add the custom action to mark the job as modified
-                        job.getLastBuild().addAction(new PipelineAgentRouterAction())
+                        job.setDefinition(new CpsFlowDefinition(modifiedPipelineScript, true))
+
+                        // Mark the job as modified
+                        job.addAction(new PipelineAgentRouterAction())
+
+                        println("[${new Date().format('yyyy-MM-dd HH:mm:ss')}] [listener: pipelineAgentRouter] [Job: ${job.name}] Job script modified.")
                     }
                 }
             } catch (Exception e) {
