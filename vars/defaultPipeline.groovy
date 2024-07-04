@@ -15,11 +15,15 @@ def call(Map config = [:]) {
         stages {
             stage('Stage 1') {
                 agent {
-                    label 'agent1'
+                    docker {
+                        image 'registry1/tools/maven-3.8.0-openjdk11:1.2.3'
+                        label 'agent1'
+                        args '-v /var/run/docker.sock:/var/run/docker.sock'
+                    }
                 }
                 steps {
                     script {
-                        echo 'Running on agent1'
+                        echo 'Running on agent1 with Docker (Maven 3.8.0, OpenJDK 11)'
                         displayParams()
                     }
                 }
@@ -27,11 +31,15 @@ def call(Map config = [:]) {
 
             stage('Stage 2') {
                 agent {
-                    label 'agent2'
+                    docker {
+                        image 'registry3/tools/node-14.17.0:1.0.0'
+                        label 'agent2'
+                        args '-v /var/run/docker.sock:/var/run/docker.sock'
+                    }
                 }
                 steps {
                     script {
-                        echo 'Running on agent2'
+                        echo 'Running on agent2 with Docker (Node.js 14.17.0)'
                         displayParams()
                     }
                 }
@@ -39,11 +47,15 @@ def call(Map config = [:]) {
 
             stage('Stage 3') {
                 agent {
-                    label 'agent3'
+                    docker {
+                        image 'registry4/tools/python-3.8:1.1.1'
+                        label 'agent3'
+                        args '-v /var/run/docker.sock:/var/run/docker.sock'
+                    }
                 }
                 steps {
                     script {
-                        echo 'Running on agent3'
+                        echo 'Running on agent3 with Docker (Python 3.8)'
                         displayParams()
                         sh '''
                             set -ex
