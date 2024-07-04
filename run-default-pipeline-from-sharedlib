@@ -1,0 +1,3 @@
+@Library('my-shared-library') _
+
+defaultPipeline()
