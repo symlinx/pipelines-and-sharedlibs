@@ -41,6 +41,14 @@ pipeline {
                 script {
                     echo 'Running on agent3'
                     displayParams()
+                    sh '''
+                        set -ex
+                        hostname
+                        id
+                        pwd
+                        env
+                        ls -ltrh
+                    '''
                 }
             }
         }
