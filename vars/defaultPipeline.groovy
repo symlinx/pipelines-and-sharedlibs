@@ -1,12 +1,15 @@
 // vars/defaultPipeline.groovy
 
-def call() {
+def call(Map config = [:]) {
+    def param1 = config.get('exampleParam1', 'defaultValue1')
+    def param2 = config.get('exampleParam2', 'defaultValue2')
+
     pipeline {
         agent none
 
         parameters {
-            string(name: 'exampleParam1', defaultValue: 'defaultValue1', description: 'An example parameter 1')
-            string(name: 'exampleParam2', defaultValue: 'defaultValue2', description: 'An example parameter 2')
+            string(name: 'exampleParam1', defaultValue: param1, description: 'An example parameter 1')
+            string(name: 'exampleParam2', defaultValue: param2, description: 'An example parameter 2')
         }
 
         stages {
