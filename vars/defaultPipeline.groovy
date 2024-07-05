@@ -23,6 +23,7 @@ def call(Map config = [:]) {
                 }
                 steps {
                     script {
+                        echo '(running in sharedlib vars/defaultPipeline.groovy)'
                         echo 'Running on agent1 with Docker (Maven 3.8.0, OpenJDK 11)'
                         displayParams()
                     }

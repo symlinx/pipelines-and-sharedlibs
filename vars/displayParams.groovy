@@ -2,7 +2,7 @@
 
 def call() {
     if (params) {
-        echo "Pipeline Parameters:"
+        echo "Pipeline Parameters (running in sharedlib vars/displayParams.groovy):"
         params.each { key, value ->
             echo "${key}: ${value}"
         }
