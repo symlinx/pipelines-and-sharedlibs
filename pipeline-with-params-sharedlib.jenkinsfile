@@ -1,7 +1,10 @@
 @Library('my-shared-library') _
 
 pipeline {
-    agent none
+    
+    agent {
+        label 'original-label'
+    }
 
     parameters {
         string(name: 'exampleParam1', defaultValue: 'defaultValue1', description: 'An example parameter 1')
@@ -9,10 +12,10 @@ pipeline {
     }
 
     stages {
-        stage('Stage 1') {
+        stage('Stage 1 (maven)') {
             agent {
                 docker {
-                    image 'registry1/tools/maven-3.8.0-openjdk11:1.2.3'
+                    image 'maven:3.8.6-jdk-11-slim'
                     label 'agent1'
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
@@ -25,10 +28,10 @@ pipeline {
             }
         }
 
-        stage('Stage 2') {
+        stage('Stage 2 (node)') {
             agent {
                 docker {
-                    image 'registry3/tools/node-14.17.0:1.0.0'
+                    image 'docker.io/node:slim'
                     label 'agent2'
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
@@ -41,14 +44,8 @@ pipeline {
             }
         }
 
-        stage('Stage 3') {
-            agent {
-                docker {
-                    image 'registry4/tools/python-3.8:1.1.1'
-                    label 'agent3'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
-            }
+        stage('Stage 3 (python)') {
+            agent{docker{image 'python:3.12'} }
             steps {
                 script {
                     echo 'Running on agent3 with Docker (Python 3.8)'
@@ -60,6 +57,7 @@ pipeline {
                         pwd
                         env
                         ls -ltrh
+                        cat /etc/os-release
                     '''
                 }
             }
