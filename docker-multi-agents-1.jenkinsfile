@@ -1,0 +1,88 @@
+@Library('my-shared-library') _
+
+pipeline {
+    
+    agent any
+
+    parameters {
+        string(name: 'exampleParam1', defaultValue: 'defaultValue1', description: 'An example parameter 1')
+        string(name: 'exampleParam2', defaultValue: 'defaultValue2', description: 'An example parameter 2')
+    }
+
+    stages {
+        stage('Stage 1 (maven)') {
+            agent {
+                docker {
+                    image 'maven:3.8.6-jdk-11-slim'
+                    label 'label1'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
+            steps {
+                script {
+                    echo 'Running stage 1'
+                    displayParams()
+                    sh '''
+                        set -ex
+                        hostname
+                        id
+                        pwd
+                        env
+                        cat /etc/os-release
+                        touch stage-1.txt
+                        ls -ltrh
+                        mvn --version 
+                    '''
+                }
+            }
+        }
+
+        stage('Stage 2 (node)') {
+            agent {
+                docker {
+                    image 'docker.io/node:slim'
+                    label 'label2'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
+            steps {
+                script {
+                    echo 'Running stage 2'
+                    displayParams()
+                    sh '''
+                        set -ex
+                        hostname
+                        id
+                        pwd
+                        env
+                        cat /etc/os-release
+                        touch stage-2.txt
+                        ls -ltrh
+                        node --version
+                    '''
+                }
+            }
+        }
+
+        stage('Stage 3 (python)') {
+            agent{docker{image 'python:3.12'} }
+            steps {
+                script {
+                    echo 'Running stage 3'
+                    displayParams()
+                    sh '''
+                        set -ex
+                        hostname
+                        id
+                        pwd
+                        env
+                        cat /etc/os-release
+                        touch stage-3.txt
+                        ls -ltrh
+                        python3 --version
+                    '''
+                }
+            }
+        }
+    }
+}

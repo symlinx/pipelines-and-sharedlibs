@@ -1,9 +1,12 @@
 @Library('my-shared-library') _
 
 pipeline {
-    
     agent {
-        label 'original-label'
+        docker {
+            image 'alpine'
+            label 'label0'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
     }
 
     parameters {
@@ -16,14 +19,25 @@ pipeline {
             agent {
                 docker {
                     image 'maven:3.8.6-jdk-11-slim'
-                    label 'agent1'
+                    label 'label1'
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
             steps {
                 script {
-                    echo 'Running on agent1 with Docker (Maven 3.8.0, OpenJDK 11)'
+                    echo 'Running stage 1'
                     displayParams()
+                    sh '''
+                        set -ex
+                        hostname
+                        id
+                        pwd
+                        env
+                        cat /etc/os-release
+                        touch stage-1.txt
+                        ls -ltrh
+                        mvn --version 
+                    '''
                 }
             }
         }
@@ -32,23 +46,13 @@ pipeline {
             agent {
                 docker {
                     image 'docker.io/node:slim'
-                    label 'agent2'
+                    label 'label2'
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
             steps {
                 script {
-                    echo 'Running on agent2 with Docker (Node.js 14.17.0)'
-                    displayParams()
-                }
-            }
-        }
-
-        stage('Stage 3 (python)') {
-            agent{docker{image 'python:3.12'} }
-            steps {
-                script {
-                    echo 'Running on agent3 with Docker (Python 3.8)'
+                    echo 'Running stage 2'
                     displayParams()
                     sh '''
                         set -ex
@@ -56,8 +60,29 @@ pipeline {
                         id
                         pwd
                         env
-                        ls -ltrh
                         cat /etc/os-release
+                        touch stage-2.txt
+                        ls -ltrh
+                        node --version
+                    '''
+                }
+            }
+        }
+
+        stage('Stage 3 (using pipeline agent)') {
+            steps {
+                script {
+                    echo 'Running stage 3'
+                    displayParams()
+                    sh '''
+                        set -ex
+                        hostname
+                        id
+                        pwd
+                        env
+                        cat /etc/os-release
+                        touch stage-3.txt
+                        ls -ltrh
                     '''
                 }
             }
